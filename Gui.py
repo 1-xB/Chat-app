@@ -1,11 +1,79 @@
-from tkinter import Tk, Frame, Scrollbar, Label, Listbox, Entry, Button, messagebox
+from tkinter import Tk, Frame, Scrollbar, Label, Listbox, Entry, Button, messagebox, StringVar
 import socket
 import threading
 import datetime
+import pyodbc
+
+
+def database():
+    def login_t():
+        login()
+
+    def login():
+        username = username_entry.get()
+        password = password_entry.get()
+        login_button.config(text="Logowanie...", bg='grey', state='disabled')
+        base.update()
+        try:
+            conn = pyodbc.connect('Driver={SQL SERVER};' +
+                                  'Server=ZALMAN;' +
+                                  'Database=app;' +
+                                  'Trusted_Connection=True;')
+            conn.autocommit = True
+            cursor = conn.cursor()
+            cursor.execute(f"SELECT * FROM users WHERE Username = '{username}' AND PasswordHash COLLATE Latin1_General_CS_AS = '{password}'")
+
+            if cursor.fetchone():
+
+                messagebox.showinfo("Success", "Zalogowano pomyślnie!")
+                base.destroy()
+                main()
+
+            else:
+                messagebox.showerror("Error", "Błędny login lub hasło!")
+                login_button.config(text="Zaloguj", bg="#4CAF50", state='normal')
+
+            cursor.close()
+            conn.close()
+        except Exception as e:
+            print(e)
+
+    base = Tk()
+    base.title("Login")
+    base.geometry("400x250")
+    base.configure(bg="#f0f0f0")
+
+    title_label = Label(base, text="Logowanie", font=("Arial", 24), bg="#f0f0f0")
+    title_label.pack(pady=10)
+
+    # Pole na nazwę użytkownika
+    username_frame = Frame(base, bg="#f0f0f0")
+    username_frame.pack(pady=5)
+    Label(username_frame, text="Login:", bg="#f0f0f0", font=("Arial", 12)).pack(side='left')
+    username_entry = Entry(username_frame, font=("Arial", 12))
+    username_entry.pack(side='right')
+
+    # Pole na hasło
+    password_frame = Frame(base, bg="#f0f0f0")
+    password_frame.pack(pady=5)
+    Label(password_frame, text="Hasło:", bg="#f0f0f0", font=("Arial", 12)).pack(side='left')
+    password_entry = Entry(password_frame, show="*", font=("Arial", 12))
+    password_entry.pack(side='right')
+
+    # Przycisk logowania
+    login_button = Button(base, text="Zaloguj", font=("Arial", 12), command=login_t, bg="#4CAF50", fg="white", padx=20,
+                          pady=5)
+    login_button.pack(pady=10)
+
+    # Pole do wyświetlania statusu logowania
+    login_status = Label(base, text="", font=("Arial", 12), bg="#f0f0f0")
+    login_status.pack()
+
+    base.mainloop()
 
 
 def main():
-    global client_socket
+    global client_socket, is_Connected
     is_Connected = False
 
     def time_():
@@ -16,8 +84,9 @@ def main():
     def disconnect():
         global is_Connected, client_socket
         if is_Connected:
+            message = f'{username_entry.get()} DISCONNECTED'
+            client_socket.send(message.encode())
             client_socket.close()
-            is_Connected = False
             chat_listbox.delete(0, 'end')
             connection_info.config(text="DISCONNECTED", fg="red")
             messagebox.showinfo("Disconnected from server", "You have been disconnected from the server")
@@ -31,6 +100,7 @@ def main():
             if not message.isspace() and message:
                 chat_listbox.insert('end', f"{username_entry.get()}: {message}")
                 client_socket.send(message.encode())
+                print(message)
                 message_entry.delete(0, 'end')
             else:
                 messagebox.showinfo("Error", "Type Something!")
@@ -140,4 +210,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    database()
