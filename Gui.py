@@ -3,8 +3,6 @@ from tkinter import Tk, Frame, Scrollbar, Label, Listbox, Entry, Button, message
 import socket
 import threading
 import datetime
-from tkinter import ttk
-
 import pyodbc
 
 
