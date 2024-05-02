@@ -1,38 +1,61 @@
 import socket
 import threading
 
-clients = {}
+clients = []
+clients_names = []
 
-def handle_client(client_socket, client_address):
+
+def receive_message(client_socket, address, name):
+    print('Connected to', address)
+
     while True:
         try:
-            data = client_socket.recv(1024).decode()
+            data = client_socket.recv(1024).decode('utf-8')
             if not data:
+                print(f"Disconnected from {name} {address}")
                 break
-            print(clients[client_socket], client_address,  ":", data)
-            for client in clients:
-                if client != client_socket:
-                    client.send((clients[client_socket]  + ": " + data).encode())
+
+            if ':' in data:
+                broadcast_message(f'{data}'.encode('utf-8'))
+
         except Exception as e:
-            print("Błąd:", e)
-            del clients[client_socket]
+            clients.remove(client_socket)
+            clients_names.remove(name)
+            for client_socket in clients:
+                try:
+                    client_socket.send(f"-delete- {name}".encode('utf-8'))
+                except Exception as e:
+                    print("delete failed!", e)
+            print(f"Disconnected from {name} {address}")
             break
-    client_socket.close()
 
-server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-host = '0.0.0.0'
-port = 12345
+def broadcast_message(message):
+    # Wyślij wiadomość do wszystkich klientów
+    for client_socket in clients:
+        try:
 
-server_socket.bind((host, port))
-server_socket.listen(5)
-print("Serwer nasłuchuje na porcie", port)
+            client_socket.send(message)
+        except Exception as e:
+            print("Error broadcasting message to a client:", e)
 
+
+HOST = '0.0.0.0'
+PORT = 12345
+
+server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+server.bind((HOST, PORT))
+server.listen(10)  # Max 10 clients
+print('listening on port...')
 while True:
-    client_socket, client_address = server_socket.accept()
-    name = client_socket.recv(1024).decode()
-    clients[client_socket] = name
-    print("Połączono z", client_address, "jako", name)
+    comm, address = server.accept()  # tego używamy do komunikacji z klientem
+    name = comm.recv(1024).decode('utf-8')
+    clients.append(comm)
+    clients_names.append(name)
+    for client_socket in clients:
+        try:
 
-    client_thread = threading.Thread(target=handle_client, args=(client_socket, client_address))
-    client_thread.start()
+            client_socket.send(f'{','.join(clients_names)}'.encode('utf-8'))
+        except Exception as e:
+            print("user-list error", e)
+    threading.Thread(target=receive_message, args=(comm, address, name)).start()

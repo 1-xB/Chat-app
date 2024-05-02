@@ -21,7 +21,8 @@ def database():
                                   'Trusted_Connection=True;')
             conn.autocommit = True
             cursor = conn.cursor()
-            cursor.execute(f"SELECT * FROM users WHERE Username = '{username}' AND PasswordHash COLLATE Latin1_General_CS_AS = '{password}'")
+            cursor.execute(
+                f"SELECT * FROM users WHERE Username = '{username}' AND PasswordHash COLLATE Latin1_General_CS_AS = '{password}'")
 
             if cursor.fetchone():
 
@@ -83,24 +84,27 @@ def main():
 
     def disconnect():
         global is_Connected, client_socket
+        print('disconnecting')
         if is_Connected:
-            message = f'{username_entry.get()} DISCONNECTED'
-            client_socket.send(message.encode())
             client_socket.close()
             chat_listbox.delete(0, 'end')
             connection_info.config(text="DISCONNECTED", fg="red")
             messagebox.showinfo("Disconnected from server", "You have been disconnected from the server")
+
+            # Sprawdź, czy użytkownik istnieje w user_listbox i usuń go
+            if username_entry.get() in user_listbox.get(0, "end"):
+                x = user_listbox.get(0, "end").index(username_entry.get())
+                user_listbox.delete(x)
         else:
             messagebox.showerror("Error", "Please connect first!")
 
     def send(event=None):
         global client_socket, is_Connected
         if is_Connected:
-            message = f"{message_entry.get()}"
+            message = f"{username_entry.get()}: {message_entry.get()}"
             if not message.isspace() and message:
-                chat_listbox.insert('end', f"{username_entry.get()}: {message}")
-                client_socket.send(message.encode())
-                print(message)
+                #chat_listbox.insert('end', f"{username_entry.get()}: {message}")
+                client_socket.send(message.encode('utf-8'))
                 message_entry.delete(0, 'end')
             else:
                 messagebox.showinfo("Error", "Type Something!")
@@ -118,6 +122,7 @@ def main():
             host = '192.168.0.139'
             port = 12345
             if username_entry.get():
+                user_listbox.insert('end', f"{username_entry.get()}")
                 connection_info.config(text="CONNECTING...", fg="gray")
                 client_socket.connect((host, port))
                 client_socket.send(username_entry.get().encode())
@@ -135,14 +140,29 @@ def main():
             messagebox.showerror("Error", "Something went wrong. Please try again later. \n Error:" + str(e))
 
     def messages_th(client_socket):
-        receive_thread = threading.Thread(target=receive_message(client_socket))
+        receive_thread = threading.Thread(target=receive_message, args=(client_socket,))
         receive_thread.start()
 
     def receive_message(client_socket):
         while True:
             try:
-                data = client_socket.recv(1024).decode()
-                chat_listbox.insert('end', data)
+                received_data = client_socket.recv(1024)
+                data = received_data.decode()
+                if ':' in data:
+                    chat_listbox.insert('end', data)
+                else:
+                    print(data)
+                    if '-delete-' not in data:
+                        print(user_listbox.get(0, 'end'))
+                        print(data.split(','))
+
+                        for i in data.split(','):
+                            if i != username_entry.get() and i not in user_listbox.get(0, 'end'):
+                                user_listbox.insert('end', i)
+                    if '-delete-' in data:
+                        print('usuwam!')
+                        print(data[8:])
+                        user_listbox.delete(user_listbox.get(0, 'end').index(data[9:]))
             except Exception as e:
                 print("Błąd:", e)
                 break
@@ -205,9 +225,12 @@ def main():
     time_label = Label(frame_chat, text="Time", font=("Arial", 20))
     time_label.place(x=560, y=1)
 
+    user_listbox = Listbox(frame_chat, height=18, width=12, font=("Arial", 12))
+    user_listbox.place(x=560, y=40)
+
     time_()
     root.mainloop()
 
 
 if __name__ == "__main__":
-    database()
+    main()
