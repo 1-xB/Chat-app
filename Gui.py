@@ -1,7 +1,10 @@
-from tkinter import Tk, Frame, Scrollbar, Label, Listbox, Entry, Button, messagebox, StringVar
+import random
+from tkinter import Tk, Frame, Scrollbar, Label, Listbox, Entry, Button, messagebox, StringVar, Text
 import socket
 import threading
 import datetime
+from tkinter import ttk
+
 import pyodbc
 
 
@@ -76,6 +79,34 @@ def database():
 def main():
     global client_socket, is_Connected
     is_Connected = False
+    users_color = {}
+    colors = ["#000000", "#ff4125", "#ff11ac", "#3c51ff", "#6f2aff", "#ff886a",
+              "#00ff00", "#ff00ff", "#00ffff", "#800080", "#008000",
+              "#0000ff", "#ff0000", "#008080", "#800000", "#808000", "#808080",
+              "#c0c0c0", "#808080", "#ff7f00", "#dda0dd", "#b0e0e6",
+              "#ff1493", "#48d1cc", "#1e90ff", "#add8e6", "#20b2aa", "#87ceeb",
+              "#191970", "#dc143c", "#8b0000", "#5f9ea0", "#32cd32", "#00ff7f",
+              "#ff4500", "#8a2be2", "#4b0082", "#d2691e", "#ff8c00", "#d2b48c",
+              "#ff6347", "#800000", "#2e8b57", "#ff69b4", "#4682b4", "#00ced1",
+              "#663399", "#da70d6", "#ff00ff", "#800080", "#ffb6c1", "#b0c4de",
+              "#00FF00", "#228B22", "#006400", "#ADFF2F", "#7FFF00", "#00FF7F",
+              "#FF0000", "#00FFFF", "#FF00FF", "#FFA500", "#FFD700", "#8A2BE2",
+              "#FF6347", "#1E90FF", "#FF4500", "#800000", "#8B0000", "#B22222",
+              "#FF69B4", "#FFC0CB", "#FF7F50", "#FF8C00", "#FFD700", "#DAA520",
+              "#B8860B", "#32CD32", "#008000", "#228B22", "#006400", "#ADFF2F",
+              "#7FFF00", "#00FF7F", "#00FF00", "#FFA500", "#FFD700",
+              "#8A2BE2", "#FF6347", "#1E90FF", "#FF4500", "#800000", "#8B0000",
+              "#B22222", "#FF0000", "#DC143C", "#FF69B4", "#FFC0CB", "#FF7F50",
+              "#FF8C00", "#FFD700", "#DAA520", "#B8860B", "#32CD32", "#008000",
+              "#228B22", "#006400", "#ADFF2F", "#7FFF00", "#00FF7F"
+              ]
+
+    def on_closing():
+        try:
+            client_socket.close()
+            root.destroy()
+        except:
+            root.destroy()
 
     def time_():
         czas = datetime.datetime.now()
@@ -86,15 +117,13 @@ def main():
         global is_Connected, client_socket
         print('disconnecting')
         if is_Connected:
-            client_socket.close()
             chat_listbox.delete(0, 'end')
+            usernames_listbox.delete(0, 'end')
+            user_listbox.delete(0, 'end')
+            client_socket.close()
             connection_info.config(text="DISCONNECTED", fg="red")
             messagebox.showinfo("Disconnected from server", "You have been disconnected from the server")
 
-            # Sprawdź, czy użytkownik istnieje w user_listbox i usuń go
-            if username_entry.get() in user_listbox.get(0, "end"):
-                x = user_listbox.get(0, "end").index(username_entry.get())
-                user_listbox.delete(x)
         else:
             messagebox.showerror("Error", "Please connect first!")
 
@@ -102,7 +131,7 @@ def main():
         global client_socket, is_Connected
         if is_Connected:
             message = f"{username_entry.get()}: {message_entry.get()}"
-            if not message.isspace() and message:
+            if not message_entry.get().isspace() and message_entry.get():
                 #chat_listbox.insert('end', f"{username_entry.get()}: {message}")
                 client_socket.send(message.encode('utf-8'))
                 message_entry.delete(0, 'end')
@@ -122,6 +151,7 @@ def main():
             host = '192.168.0.139'
             port = 12345
             if username_entry.get():
+                users_color[username_entry.get()] = random.choice(colors)
                 user_listbox.insert('end', f"{username_entry.get()}")
                 connection_info.config(text="CONNECTING...", fg="gray")
                 client_socket.connect((host, port))
@@ -149,15 +179,28 @@ def main():
                 received_data = client_socket.recv(1024)
                 data = received_data.decode()
                 if ':' in data:
-                    chat_listbox.insert('end', data)
+                    data = data.split(':', 1)
+                    usernames_listbox.config(state='normal')
+                    usernames_listbox.tag_configure(users_color[data[0]], foreground=users_color[data[0]])
+                    usernames_listbox.insert('end', data[0] + ":" + '\n', users_color[data[0]])
+                    print(users_color[data[0]])
+                    usernames_listbox.config(state='disabled')
+                    if len(data[1]) > 30:
+                        times = len(data[1]) // 48
+                        for i in range(times):
+                            chat_listbox.insert('end', data[1][i * 48:(i + 1) * 48] + '\n')
+                            usernames_listbox.config(state='normal')
+                            usernames_listbox.insert('end', '\n')
+                            usernames_listbox.config(state='disabled')
+                    else:
+                        chat_listbox.insert('end', data[1])
+
                 else:
-                    print(data)
                     if '-delete-' not in data:
-                        print(user_listbox.get(0, 'end'))
-                        print(data.split(','))
 
                         for i in data.split(','):
                             if i != username_entry.get() and i not in user_listbox.get(0, 'end'):
+                                users_color[i] = random.choice(colors)
                                 user_listbox.insert('end', i)
                     if '-delete-' in data:
                         print('usuwam!')
@@ -201,21 +244,31 @@ def main():
     username_entry = Entry(frame_menu, width=20)
     username_entry.pack(padx=5, pady=5)
 
-    Label(frame_chat, text="Chat:", bg=bg_color, fg="blue", font=("Arial", 12, "bold")).grid(row=0, column=0, padx=5,
-                                                                                             pady=5, sticky="w")
-    chat_listbox = Listbox(frame_chat, height=18, width=35, font=("Arial", 12))
-    chat_listbox.grid(row=1, column=0, columnspan=2, padx=5, pady=5, sticky="nsew")
-    scrollbar = Scrollbar(frame_chat, command=chat_listbox.yview)
-    scrollbar.grid(row=1, column=2, sticky='ns')
+    Label(frame_chat, text="Chat:", bg=bg_color, fg="blue", font=("Arial", 12, "bold")).grid(row=0, column=0, padx=5, )
+
+    chat = Frame(frame_chat, bg=bg_color, bd=10)
+    chat.grid(row=1, column=0)
+    usernames_listbox = Text(chat, height=19, width=16,font=("Arial", 12), state='disabled')
+    usernames_listbox.grid(row=0, column=0, padx=(5, 0), sticky='e')
+    #usernames_listbox = ttk.Treeview(chat, height=16)
+    #usernames_listbox.grid(row=0, column=0, padx=(5, 0), sticky='e')
+    #usernames_listbox.column("#0", width=110)
+
+    chat_listbox = Listbox(chat, height=18, width=40, font=("Arial", 12))
+    chat_listbox.grid(row=0, column=1, padx=(0, 5), sticky='w')
+
+    scrollbar = Scrollbar(chat, command=lambda *args: (chat_listbox.yview(*args), usernames_listbox.yview(*args)))
+    scrollbar.grid(row=0, column=2, sticky='ns')
     chat_listbox.config(yscrollcommand=scrollbar.set)
+    usernames_listbox.config(yscrollcommand=scrollbar.set)
 
     Label(frame_chat, text="Message:", bg=bg_color, fg="blue", font=("Arial", 12, "bold")).grid(row=2, column=0, padx=5,
                                                                                                 pady=5, sticky="w")
     message_entry = Entry(frame_chat, width=60)
-    message_entry.grid(row=3, column=0, padx=5, pady=5)
+    message_entry.grid(row=3, column=0, padx=5, sticky="w")
     send_button = Button(frame_chat, text="Send", command=send, bg=button_color, fg=button_text_color,
                          font=("Arial", 10, "bold"))
-    send_button.grid(row=3, column=1, padx=5, pady=5, sticky="w")
+    send_button.place(x=400, y=420)
 
     message_entry.bind("<Return>", send)
 
@@ -226,9 +279,10 @@ def main():
     time_label.place(x=560, y=1)
 
     user_listbox = Listbox(frame_chat, height=18, width=12, font=("Arial", 12))
-    user_listbox.place(x=560, y=40)
+    user_listbox.place(x=550, y=35)
 
     time_()
+    root.protocol("WM_DELETE_WINDOW", on_closing)
     root.mainloop()
 
 
