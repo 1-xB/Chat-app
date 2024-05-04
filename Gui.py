@@ -1,5 +1,5 @@
 import random
-from tkinter import Tk, Frame, Scrollbar, Label, Listbox, Entry, Button, messagebox, StringVar, Text
+from tkinter import Tk, Frame, Scrollbar, Label, Listbox, Entry, Button, messagebox, Text
 import socket
 import threading
 import datetime
@@ -17,9 +17,9 @@ def database():
         base.update()
         try:
             conn = pyodbc.connect('Driver={SQL SERVER};' +
-                                  'Server=ZALMAN;' +
+                                  'Server=192.168.0.131,1433;' +
                                   'Database=app;' +
-                                  'Trusted_Connection=True;')
+                                  'Trusted_Connection=no;')
             conn.autocommit = True
             cursor = conn.cursor()
             cursor.execute(
@@ -116,10 +116,14 @@ def main():
         print('disconnecting')
         if is_Connected:
             chat_listbox.delete(0, 'end')
-            usernames_listbox.delete(0, 'end')
+            usernames_listbox.config(state='normal')
+            usernames_listbox.delete(1.0, 'end')
+            usernames_listbox.config(state='disabled')
             user_listbox.delete(0, 'end')
+
             client_socket.close()
             connection_info.config(text="DISCONNECTED", fg="red")
+            username_entry.config(state='normal')
             messagebox.showinfo("Disconnected from server", "You have been disconnected from the server")
 
         else:
@@ -150,22 +154,25 @@ def main():
             port = 12345
             if username_entry.get():
                 users_color[username_entry.get()] = random.choice(colors)
-                user_listbox.insert('end', f"{username_entry.get()}")
+
                 connection_info.config(text="CONNECTING...", fg="gray")
                 client_socket.connect((host, port))
                 client_socket.send(username_entry.get().encode())
+                user_listbox.insert('end', f"{username_entry.get()}")
                 is_Connected = True
 
                 connection_info.config(text="CONNECTED", fg="green")
                 messagebox.showinfo("Connected to server", "You have been connected to the server")
 
                 messages_th(client_socket)
+                username_entry.config(state='disabled')
             else:
                 messagebox.showerror("Error", "Please enter a username!")
                 connection_info.config(text="NOT CONNECTED", fg="red")
         except Exception as e:
             connection_info.config(text="NOT CONNECTED", fg="red")
             messagebox.showerror("Error", "Something went wrong. Please try again later. \n Error:" + str(e))
+
 
     def messages_th(client_socket):
         receive_thread = threading.Thread(target=receive_message, args=(client_socket,))
@@ -285,4 +292,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    database()
