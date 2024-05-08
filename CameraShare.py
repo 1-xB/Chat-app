@@ -9,8 +9,7 @@ sending = CameraClient('192.168.0.139', 9999)
 t1 = threading.Thread(target=receive.start_server())
 t1.start()
 
-time.sleep(2)
-
+time.sleep(1)
 t2 = threading.Thread(target=sending.start_stream())
 t2.start()
 
