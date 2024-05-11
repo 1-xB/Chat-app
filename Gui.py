@@ -4,6 +4,15 @@ import socket
 import threading
 import datetime
 import pyodbc
+from sys import exit
+from pygame import mixer
+from vidstream import *
+
+is_window_call = None
+
+mixer.init()
+ringtone = mixer.Sound('ringtone.mp3')
+notification = mixer.Sound('Notification.mp3')
 
 
 def database():
@@ -99,12 +108,95 @@ def main():
               "#228B22", "#006400", "#ADFF2F", "#7FFF00", "#00FF7F"
               ]
 
+    def conversation(host1, host2):
+        global call
+        call = True
+
+        def control():
+            global receive, receive2, sending, sending2
+            user_listbox.delete(0, 'end')
+
+            client_socket.close()
+            connection_info.config(text="DISCONNECTED", fg="red")
+            def end():
+                global call
+                call = False
+                camera()
+                exit(conversation)
+                window.destroy()
+
+            window = Tk()
+            window.geometry("300x300")
+            Label(window, text=f'Control Panel', font=(30)).pack()
+            Button(window, text="DISCONNECT", font=30, command=end).pack()
+            window.mainloop()
+
+        def camera():
+            global receive, receive2, sending, sending2, call
+            if call:
+                receive = StreamingServer(host1, 1111)
+                receive2 = AudioReceiver(host1, 9999)
+                sending = CameraClient(host2, 1111)
+                sending2 = AudioSender(host2, 9999)
+                t1 = threading.Thread(target=receive.start_server())
+                t2 = threading.Thread(target=receive2.start_server())
+
+                t1.start()
+                t2.start()
+
+
+                t3 = threading.Thread(target=sending.start_stream())
+                t4 = threading.Thread(target=sending2.start_stream())
+                t4.start()
+                t3.start()
+                exit()
+            else:
+                sending.stop_stream()
+                sending2.stop_stream()
+                receive.stop_server()
+                receive2.stop_server()
+
+        threading.Thread(target=camera).start()
+        threading.Thread(target=control).start()
+        exit(conversation)
+
+    def call_window(name):
+        def call():
+            message = f"calling-from-{username_entry.get()}-{name}"
+
+            client_socket.send(message.encode('utf-8'))
+            root.destroy()
+
+        def on_closing():
+            global is_window_call
+            is_window_call = False
+
+            root.destroy()
+
+        global is_window_call
+        is_window_call = True
+        root = Tk()
+        root.resizable(False, False)
+        root.geometry("300x300")
+        Label(root, text=f'Username: {name}', font=(30)).pack()
+        Button(root, text="Call", font=30, command=call).pack()
+        Button(root, text="Exit", font=30, command=on_closing).pack()
+        root.protocol("WM_DELETE_WINDOW", on_closing)
+        root.mainloop()
+
     def on_closing():
         try:
             client_socket.close()
-            root.destroy()
+            exit()
         except:
-            root.destroy()
+            exit()
+
+    def listbox_click(event):
+        global is_window_call
+        index = user_listbox.nearest(event.y)
+        if user_listbox.get(index) and not is_window_call:
+            thread_call = threading.Thread(target=call_window(user_listbox.get(index)))
+            thread_call.start()
 
     def time_():
         czas = datetime.datetime.now()
@@ -173,6 +265,32 @@ def main():
             connection_info.config(text="NOT CONNECTED", fg="red")
             messagebox.showerror("Error", "Something went wrong. Please try again later. \n Error:" + str(e))
 
+    def calling(name):
+        def calling_accept():
+            ringtone.stop()
+            message = f"acceptcalling-from-{username_entry.get()}-{name}"
+            client_socket.send(message.encode('utf-8'))
+            print('koniec')
+            window.destroy()
+            exit(calling)
+
+        def calling_decline():
+            ringtone.stop()
+            window.destroy()
+
+        def close():
+            ringtone.stop()
+            window.destroy()
+            exit(calling)
+
+        window = Tk()
+        window.resizable(False, False)
+        window.geometry("300x200")
+        Label(window, text=f"{name} is calling to you!", font=(30)).pack()
+        Button(window, text="Accept", command=calling_accept).pack()
+        Button(window, text="Decline", command=calling_decline).pack()
+        window.protocol("WM_DELETE_WINDOW", close)
+        window.mainloop()
 
     def messages_th(client_socket):
         receive_thread = threading.Thread(target=receive_message, args=(client_socket,))
@@ -183,12 +301,15 @@ def main():
             try:
                 received_data = client_socket.recv(1024)
                 data = received_data.decode()
-                if ':' in data:
+                print(1)
+
+                if ':' in data and '-calling-' not in data:
                     data = data.split(':', 1)
                     usernames_listbox.config(state='normal')
                     usernames_listbox.tag_configure(users_color[data[0]], foreground=users_color[data[0]])
                     usernames_listbox.insert('end', data[0] + ":" + '\n', users_color[data[0]])
-                    print(users_color[data[0]])
+                    if data[0] != username_entry.get():
+                        notification.play()
                     usernames_listbox.config(state='disabled')
                     if len(data[1]) > 30:
                         times = len(data[1]) // 48
@@ -199,7 +320,23 @@ def main():
                             usernames_listbox.config(state='disabled')
                     else:
                         chat_listbox.insert('end', data[1])
+                elif 'calling-' in data and ':' not in data:
+                    data = data.split('-')
+                    if data[2] != username_entry.get() and data[3] == username_entry.get():
+                        ringtone.play()
+                        Thread = threading.Thread(target=calling(data[2]))
+                        Thread.start()
 
+                        Thread.join()
+                    else:
+                        pass
+                elif 'accept-' in data and ':' not in data and username_entry.get() in data:
+                    print('wejscie')
+                    data = data.split('-')
+                    print(f'data - {data}')
+                    print(data[3])
+                    print(data[5])
+                    threading.Thread(target=conversation(data[3], data[5])).start()
                 else:
                     if '-delete-' not in data:
 
@@ -207,10 +344,9 @@ def main():
                             if i != username_entry.get() and i not in user_listbox.get(0, 'end'):
                                 users_color[i] = random.choice(colors)
                                 user_listbox.insert('end', i)
-                    if '-delete-' in data:
-                        print('usuwam!')
-                        print(data[8:])
+                    elif '-delete-' in data:
                         user_listbox.delete(user_listbox.get(0, 'end').index(data[9:]))
+
             except Exception as e:
                 print("Błąd:", e)
                 break
@@ -253,7 +389,7 @@ def main():
 
     chat = Frame(frame_chat, bg=bg_color, bd=10)
     chat.grid(row=1, column=0)
-    usernames_listbox = Text(chat, height=19, width=16,font=("Arial", 12), state='disabled')
+    usernames_listbox = Text(chat, height=19, width=16, font=("Arial", 12), state='disabled')
     usernames_listbox.grid(row=0, column=0, padx=(5, 0), sticky='e')
     #usernames_listbox = ttk.Treeview(chat, height=16)
     #usernames_listbox.grid(row=0, column=0, padx=(5, 0), sticky='e')
@@ -285,6 +421,7 @@ def main():
 
     user_listbox = Listbox(frame_chat, height=18, width=12, font=("Arial", 12))
     user_listbox.place(x=550, y=35)
+    user_listbox.bind("<Button-1>", listbox_click)
 
     time_()
     root.protocol("WM_DELETE_WINDOW", on_closing)
@@ -292,4 +429,4 @@ def main():
 
 
 if __name__ == "__main__":
-    database()
+    main()
