@@ -114,13 +114,11 @@ def main():
         call = True
 
         def control():
-            global receive, receive2, sending, sending2
-
             def end():
                 global call, is_window_call
                 call = False
                 is_window_call = False
-                camera()
+                stop_streaming()
                 window.destroy()
 
             window = Tk()
@@ -129,46 +127,38 @@ def main():
             Button(window, text="DISCONNECT", font=30, command=end).pack()
             window.mainloop()
 
-        def camera():
-            global receive, receive2, sending, sending2, call, is_window_call
-            if call:
-                receive = StreamingServer(host1, 1111)
-                receive2 = AudioReceiver(host1, 9999)
-                sending = CameraClient(host2, 1111)
-                sending2 = AudioSender(host2, 9999)
-                t1 = threading.Thread(target=receive.start_server())
-                t2 = threading.Thread(target=receive2.start_server())
+        def start_streaming():
+            global receive, receive2, sending, sending2
+            receive = StreamingServer(host1, 1111)
+            receive2 = AudioReceiver(host1, 9999)
+            sending = CameraClient(host2, 1111)
+            sending2 = AudioSender(host2, 9999)
 
-                t1.start()
-                t2.start()
+            receive.start_server()
+            receive2.start_server()
+            sending.start_stream()
+            sending2.start_stream()
 
+        def stop_streaming():
+            global receive, receive2, sending, sending2
+            sending.stop_stream()
+            sending2.stop_stream()
+            receive.stop_server()
+            receive2.stop_server()
 
-                t3 = threading.Thread(target=sending.start_stream())
-                t4 = threading.Thread(target=sending2.start_stream())
-                t4.start()
-                t3.start()
-                exit()
-            else:
-                sending.stop_stream()
-                sending2.stop_stream()
-                receive.stop_server()
-                receive2.stop_server()
-                is_window_call = False
-
-        threading.Thread(target=camera).start()
+        # Start streaming and control threads
+        threading.Thread(target=start_streaming).start()
         threading.Thread(target=control).start()
 
     def call_window(name):
         def call():
             message = f"calling-from-{username_entry.get()}-{name}"
-
             client_socket.send(message.encode('utf-8'))
             root.destroy()
 
         def on_closing():
             global is_window_call
             is_window_call = False
-
             root.destroy()
 
         global is_window_call
