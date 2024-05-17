@@ -114,10 +114,7 @@ def main():
 
         def control():
             global receive, receive2, sending, sending2
-            user_listbox.delete(0, 'end')
 
-            client_socket.close()
-            connection_info.config(text="DISCONNECTED", fg="red")
             def end():
                 global call
                 call = False
@@ -326,7 +323,6 @@ def main():
                         ringtone.play()
                         Thread = threading.Thread(target=calling(data[2]))
                         Thread.start()
-
                         Thread.join()
                     else:
                         pass
@@ -334,9 +330,17 @@ def main():
                     print('wejscie')
                     data = data.split('-')
                     print(f'data - {data}')
-                    print(data[3])
-                    print(data[5])
-                    threading.Thread(target=conversation(data[3], data[5])).start()
+
+                    if data[2] == username_entry.get():
+                        h1 = data[3]
+                        h2 = data[5]
+                    else:
+                        h2 = data[3]
+                        h1 = data[5]
+                    t = threading.Thread(target=conversation(h1, h2))
+                    disconnect()
+                    t.start()
+                    t.join()
                 else:
                     if '-delete-' not in data:
 
