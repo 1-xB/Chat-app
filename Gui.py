@@ -1,4 +1,5 @@
 import random
+import time
 from tkinter import Tk, Frame, Scrollbar, Label, Listbox, Entry, Button, messagebox, Text
 import socket
 import threading
@@ -109,17 +110,17 @@ def main():
               ]
 
     def conversation(host1, host2):
-        global call
+        global call, is_window_call
         call = True
 
         def control():
             global receive, receive2, sending, sending2
 
             def end():
-                global call
+                global call, is_window_call
                 call = False
+                is_window_call = False
                 camera()
-                exit(conversation)
                 window.destroy()
 
             window = Tk()
@@ -129,7 +130,7 @@ def main():
             window.mainloop()
 
         def camera():
-            global receive, receive2, sending, sending2, call
+            global receive, receive2, sending, sending2, call, is_window_call
             if call:
                 receive = StreamingServer(host1, 1111)
                 receive2 = AudioReceiver(host1, 9999)
@@ -152,10 +153,10 @@ def main():
                 sending2.stop_stream()
                 receive.stop_server()
                 receive2.stop_server()
+                is_window_call = False
 
         threading.Thread(target=camera).start()
         threading.Thread(target=control).start()
-        exit(conversation)
 
     def call_window(name):
         def call():
@@ -213,7 +214,7 @@ def main():
             client_socket.close()
             connection_info.config(text="DISCONNECTED", fg="red")
             username_entry.config(state='normal')
-            messagebox.showinfo("Disconnected from server", "You have been disconnected from the server")
+            #messagebox.showinfo("Disconnected from server", "You have been disconnected from the server")
 
         else:
             messagebox.showerror("Error", "Please connect first!")
@@ -269,7 +270,6 @@ def main():
             client_socket.send(message.encode('utf-8'))
             print('koniec')
             window.destroy()
-            exit(calling)
 
         def calling_decline():
             ringtone.stop()
@@ -278,7 +278,6 @@ def main():
         def close():
             ringtone.stop()
             window.destroy()
-            exit(calling)
 
         window = Tk()
         window.resizable(False, False)
@@ -323,7 +322,6 @@ def main():
                         ringtone.play()
                         Thread = threading.Thread(target=calling(data[2]))
                         Thread.start()
-                        Thread.join()
                     else:
                         pass
                 elif 'accept-' in data and ':' not in data and username_entry.get() in data:
@@ -337,10 +335,10 @@ def main():
                     else:
                         h2 = data[3]
                         h1 = data[5]
-                    t = threading.Thread(target=conversation(h1, h2))
                     disconnect()
+                    t = threading.Thread(target=conversation(h2, h1))
+
                     t.start()
-                    t.join()
                 else:
                     if '-delete-' not in data:
 
